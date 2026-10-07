@@ -37,7 +37,6 @@ cliente_groq = Groq(api_key=st.secrets["GROQ_API_KEY"])
 MODELO = "llama-3.1-8b-instant" # Equivalente ao 8B rápido no Groq
 
 # ────────────────────────────── CONFIGURAÇÃO BASE ──────────────────────────────
-MODELO = "llama3.2"
 FUSO = ZoneInfo("Europe/Lisbon")
 LIMITE_HISTORICO = 6
 CAMPOS = ("titulo", "data", "hora_inicio", "hora_fim", "descricao", "recorrencia")
@@ -510,14 +509,14 @@ Escreves APENAS três textos curtos. As listas são inseridas por outro sistema:
  "conselho": "Sugiro usar a janela das 11:00 para começar a rever a matéria do teste de Cálculo 1 de quinta-feira, dia 15/10."}}
 
 Responde apenas com o JSON."""
-    r = ollama.chat(
+    r = cliente_groq.chat.completions.create(
         model=MODELO,
         messages=[{"role": "system", "content": prompt},
                   {"role": "user", "content": "Gera o briefing."}],
-        format=SCHEMA_BRIEFING,
-        options={"temperature": 0.2},
+        response_format={"type": "json_object"},
+        temperature=0.2,
     )
-    return json.loads(r["message"]["content"])
+    return json.loads(r.choices[0].message.content)
 
 
 def _horas_ok(textos: list[str], factos: str) -> bool:
@@ -570,7 +569,7 @@ def briefing_jarvis(eventos: list[dict]) -> str:
         textos = [txt.get("resumo", ""), txt.get("analise", ""), txt.get("conselho", "")]
         if not all(textos) or not _horas_ok(textos, factos) or not _coerente(txt, a, radar, modo_vespera):
             txt = texto_reserva(a, radar)
-    except (ollama.ResponseError, ConnectionError) as exc:
+    except Exception as exc:
         raise ErroIA("Não consegui gerar o briefing estratégico.") from exc
     except (json.JSONDecodeError, KeyError):
         txt = texto_reserva(a, radar)
