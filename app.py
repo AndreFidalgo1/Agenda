@@ -34,7 +34,7 @@ if not st.session_state.autenticado:
 
 # Inicializa o cliente do Groq
 cliente_groq = Groq(api_key=st.secrets["GROQ_API_KEY"])
-MODELO = "llama-3.1-8b-instant" # Equivalente ao 8B rápido no Groq
+MODELO = "openai/gpt-oss-20b" # Equivalente ao 8B rápido no Groq
 
 # ────────────────────────────── CONFIGURAÇÃO BASE ──────────────────────────────
 FUSO = ZoneInfo("Europe/Lisbon")
