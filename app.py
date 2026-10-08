@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from groq import Groq
 import streamlit as st
 from streamlit_calendar import calendar
-from calendar_helper import apagar_evento, criar_evento, listar_proximos_eventos
+from calendar_helper import apagar_evento, criar_evento, listar_proximos_eventos, listar_tarefas_pendentes, adicionar_tarefa, concluir_tarefa
 
 st.set_page_config(page_title="J.A.R.V.I.S. Protocol", page_icon="🤖", layout="wide")
 logger = logging.getLogger("jarvis")
@@ -407,7 +407,7 @@ def perfil_dia(a) -> str:
     return ("vazio" if h == 0 else "leve" if h < 3
             else "moderado" if h < 6 else "pesado")
 
-def construir_factos(hoje, foco, modo_vespera, a, radar, carga) -> str:
+def construir_factos(hoje, foco, modo_vespera, a, radar, carga, tarefas) -> str:
     evs = a["eventos"]
     aulas = [e for e in evs if e.tipo == "aula"]
     aval = [e for e in evs if e.tipo == "avaliacao"]
@@ -426,8 +426,10 @@ def construir_factos(hoje, foco, modo_vespera, a, radar, carga) -> str:
         f"AVALIAÇÕES no dia de foco ({len(aval)}): {lst(aval)}.",
         f"COMPROMISSOS NÃO-ACADÉMICOS no dia de foco ({len(comp)}): {lst(comp)}.",
     ]
+    
     if a["maior_seq"] >= timedelta(hours=3):
         L.append(f"Maior bloco seguido sem pausa: {_dur(a['maior_seq'])}.")
+        
     if a["janelas"]:
         mj = max(a["janelas"], key=lambda j: j[1] - j[0])
         L.append("Janelas livres no dia de foco: " + "; ".join(
@@ -445,6 +447,15 @@ def construir_factos(hoje, foco, modo_vespera, a, radar, carga) -> str:
                      f"(daqui a {dias} dias).")
     else:
         L.append("RADAR: nada de relevante nos próximos 7 dias.")
+        
+    # --- NOVA INJEÇÃO: BACKLOG DE TAREFAS ---
+    if tarefas:
+        L.append("BACKLOG DE TAREFAS (Sem data fixa):")
+        for t in tarefas:
+            L.append(f"  - Prioridade {t['prioridade']}: {t['tarefa']}")
+    else:
+        L.append("BACKLOG DE TAREFAS: Vazio. Não há pendências.")
+
     return "\n".join(L)
 
 def render_agenda(a, hoje, modo_vespera):
@@ -562,7 +573,12 @@ def briefing_jarvis(eventos: list[dict]) -> str:
     a = analisar_dia(evs, foco, hoje)
     radar = selecionar_radar(evs, foco)
     carga = carga_semana(evs, foco, hoje)
-    factos = construir_factos(hoje, foco, modo_vespera, a, radar, carga)
+    
+    # --- NOVA LIGAÇÃO: CARREGAR AS TAREFAS DA BASE DE DADOS ---
+    tarefas = listar_tarefas_pendentes()
+    
+    # Passamos as tarefas como o último argumento para a função construir_factos
+    factos = construir_factos(hoje, foco, modo_vespera, a, radar, carga, tarefas)
 
     try:
         txt = pedir_texto_ao_modelo(factos)
@@ -576,6 +592,7 @@ def briefing_jarvis(eventos: list[dict]) -> str:
 
     titulo_foco = (f"Foco: Amanhã ({_dia_curto(foco)})" if modo_vespera
                    else f"Foco Imediato (Hoje, {_dia_curto(foco)})")
+    
     return f"""## 📊 Resumo Executivo
 {txt['resumo']}
 
@@ -656,13 +673,36 @@ def renderizar_sidebar() -> None:
                 with st.spinner("A compilar o relatório estratégico..."):
                     resumo = briefing_jarvis(obter_eventos(15))
                 st.session_state.mensagens += [
-                    {"role": "user", "content": "J.A.R.V.I.S., dá-me o relatório da agenda.",
+                    {"role": "user", "content": "J.A.R.V.I.S., dá-me o relatório da agenda e tarefas.",
                      "briefing": True},
                     {"role": "assistant", "content": resumo, "briefing": True}]
             except Exception as exc: 
                 logger.exception("Briefing falhou")
                 st.error(str(exc) if isinstance(exc, ErroIA) else "Falha ao recolher dados.")
-        st.toggle("Tema claro do calendário", key="modo_claro")
+        st.toggle("Tema claro", key="modo_claro")
+        
+        st.divider()
+        st.markdown("### 📝 Backlog de Tarefas")
+        nova_tarefa = st.text_input("Nova tarefa:", placeholder="O que não me posso esquecer?")
+        prioridade = st.selectbox("Prioridade:", ["Alta", "Média", "Baixa"])
+        if st.button("➕ Adicionar Tarefa", use_container_width=True):
+            if nova_tarefa:
+                adicionar_tarefa(nova_tarefa, prioridade)
+                st.toast("Tarefa guardada na base de dados.", icon="✅")
+                st.rerun()
+            else:
+                st.error("Escreva uma tarefa primeiro.")
+                
+        tarefas = listar_tarefas_pendentes()
+        if tarefas:
+            st.markdown("**Pendentes:**")
+            for t in tarefas:
+                col1, col2 = st.columns([5, 1])
+                icone_pri = "🔴" if t['prioridade'] == "Alta" else "🟡" if t['prioridade'] == "Média" else "🔵"
+                col1.caption(f"{icone_pri} {t['tarefa']}")
+                if col2.button("✅", key=f"t_{t['linha_excel']}", help="Marcar como concluído"):
+                    concluir_tarefa(t['linha_excel'])
+                    st.rerun()
 
 def renderizar_revisao() -> None:
     p = st.session_state.evento_pendente
