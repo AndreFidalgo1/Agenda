@@ -53,7 +53,7 @@ def criar_evento(dados_evento):
         evento['end'] = {'date': data_string}
 
     # ATENÇÃO: Substitui o email abaixo pelo teu email real (o que usaste antes)
-    evento_criado = servico.events().insert(calendarId='o_teu_email_real@gmail.com', body=evento).execute()
+    evento_criado = servico.events().insert(calendarId='fidalgoandre90@gmail.com', body=evento).execute()
     return evento_criado.get('htmlLink')
 
 def listar_proximos_eventos(max_resultados=50):
@@ -61,7 +61,7 @@ def listar_proximos_eventos(max_resultados=50):
     agora = datetime.datetime.utcnow().isoformat() + 'Z' 
     
     eventos_resultado = servico.events().list(
-        calendarId='o_teu_email_real@gmail.com', 
+        calendarId='fidalgoandre90@gmail.com', 
         timeMin=agora,
         maxResults=max_resultados, 
         singleEvents=True,
@@ -72,7 +72,7 @@ def listar_proximos_eventos(max_resultados=50):
 
 def apagar_evento(evento_id):
     servico = fazer_login_google()
-    servico.events().delete(calendarId='o_teu_email_real@gmail.com', eventId=evento_id).execute()
+    servico.events().delete(calendarId='fidalgoandre90@gmail.com', eventId=evento_id).execute()
     return True
 
 
