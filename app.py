@@ -296,7 +296,7 @@ def classificar(titulo: str, e: dict) -> str:
 
 def _dt(s: str) -> datetime:
     d = datetime.fromisoformat(s.replace("Z", "+00:00"))
-    return d.astimezone().replace(tzinfo=None) if d.tzinfo else d
+    return d.astimezone(FUSO).replace(tzinfo=None) if d.tzinfo else d
 
 def _fim_evento(e: dict) -> str | None:
     f = e.get("end", {})
